@@ -2,14 +2,13 @@ import asyncio
 
 from logging.config import fileConfig
 
-from sqlalchemy import async_engine_from_config
+from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
 
-from bot.db.models.base import Base
-from bot.config import config as app_config
-from bot.db.models import user, room, booking, review, bar_item
+from database.models.base import Base
+from config import config as app_config
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -22,7 +21,7 @@ if config.config_file_name is not None:
 
 config.set_main_option(
     "sqlalchemy.url",
-    f"postgresql+asyncpg://{app_config.db_user}:{app_config.db_password}@{app_config.db_host}:{app_config.db_port}/{app_config.db_name}"
+    f"postgresql+asyncpg://{app_config.postgres_user}:{app_config.postgres_password}@{app_config.postgres_host}:{app_config.postgres_port}/{app_config.postgres_host}"
 )
 
 # add your model's MetaData object here

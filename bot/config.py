@@ -2,7 +2,6 @@ from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
-
 class Settings(BaseSettings):
     bot_token: SecretStr
 
@@ -22,8 +21,10 @@ class Settings(BaseSettings):
 
     admins: List[int]
     admin_password: str
-    
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    class Config:
+        env_file = ".env"
+        extra = "ignore"
 
     @field_validator("admins", mode="before")
     def split_admins(cls, v):
@@ -31,5 +32,8 @@ class Settings(BaseSettings):
             return [int(admin.strip()) for admin in v.split(",")]
         return v
 
+    @property
+    def postgres_user_secret(self):
+        return self.postgres_user.get_secret_value() 
 
 config = Settings()
