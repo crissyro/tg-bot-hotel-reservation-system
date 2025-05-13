@@ -5,7 +5,6 @@ from typing import List
 
 class Settings(BaseSettings):
     bot_token: SecretStr
-    admins: List[int]
 
     postgres_user: str
     postgres_password: SecretStr
@@ -21,6 +20,9 @@ class Settings(BaseSettings):
     redis_port: int
     redis_db: int = 0
 
+    admins: List[int]
+    admin_password: str
+    
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @field_validator("admins", mode="before")

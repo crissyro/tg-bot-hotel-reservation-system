@@ -1,10 +1,11 @@
-from aiogram import Router, F
+from aiogram import Router
+from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 router = Router()
 
 
-@router.message(F.text == "/start")
+@router.message(CommandStart())
 async def user_start_handler(message: Message):
     await message.answer(
         "<b>🏨 Добро пожаловать в отель-бот!</b>\n\n"
