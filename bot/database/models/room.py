@@ -1,5 +1,5 @@
 from sqlalchemy import String, Boolean
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 class Room(Base):
@@ -9,3 +9,5 @@ class Room(Base):
     level: Mapped[str] = mapped_column(String(16)) 
     price: Mapped[float] = mapped_column()
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    bookings = relationship("Booking", back_populates="room")

@@ -1,5 +1,5 @@
 from sqlalchemy import ForeignKey, Date
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 class Booking(Base):
@@ -11,3 +11,6 @@ class Booking(Base):
     check_in: Mapped[Date]
     check_out: Mapped[Date]
     is_paid: Mapped[bool] = mapped_column(default=False)
+    
+    user = relationship("User", back_populates="bookings")
+    room = relationship("Room", back_populates="bookings")
