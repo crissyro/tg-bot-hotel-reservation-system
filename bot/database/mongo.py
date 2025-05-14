@@ -1,8 +1,9 @@
 from motor.motor_asyncio import AsyncIOMotorClient
+from config import config
 
-MONGO_URI = "mongodb://localhost:27017"
-client = AsyncIOMotorClient(MONGO_URI)
-db = client["hotel_bot"]
-
-users_collection = db["users"]
+client = AsyncIOMotorClient(
+    f"mongodb://{config.mongo_user}:{config.mongo_password.get_secret_value()}"
+    f"@{config.mongo_host}:{config.mongo_port}"
+)
+db = client[config.mongo_db]
 feedback_collection = db["feedback"]

@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     postgres_host: str
     postgres_port: int
 
+    mongo_user: str
+    mongo_password: SecretStr
     mongo_host: str
     mongo_port: int
     mongo_db: str

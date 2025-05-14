@@ -1,10 +1,9 @@
 import redis.asyncio as redis
-from aiogram import Bot
+from config import config
 
-redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
-
-async def set_value(key: str, value: str, expire: int = 3600):
-    await redis_client.set(key, value, ex=expire)
-
-async def get_value(key: str):
-    return await redis_client.get(key)
+redis_client = redis.Redis(
+    host=config.redis_host,
+    port=config.redis_port,
+    db=config.redis_db,
+    decode_responses=True
+)
