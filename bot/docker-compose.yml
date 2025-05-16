@@ -7,11 +7,11 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
-#    depends_on:
-#      postgres:
-#        condition: service_healthy
-#      mongo:
-#        condition: service_healthy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
     networks:
       - backend
 
@@ -40,12 +40,13 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     volumes:
       - mongo_data:/data/db
+    ports:
+      - "27017:27017"
     healthcheck:
-      test: |
-        echo 'db.runCommand("ping").ok' | mongo -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --quiet | grep 1
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
-      timeout: 3s
-      retries: 5
+      timeout: 5s
+      retries: 10
     networks:
       - backend
 

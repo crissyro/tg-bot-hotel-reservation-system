@@ -6,12 +6,12 @@ from aiogram.fsm.state import StatesGroup, State
 from config.config import config
 from keyboards.admin import admin_panel_keyboard
 
-router = Router()
+auth_router = Router()
 
 class AdminAuth(StatesGroup):
     waiting_password = State()
 
-@router.message(Command("admin_input"))
+@auth_router.message(Command("admin_input"))
 async def admin_login(message: types.Message, state: FSMContext):
     if message.from_user.id not in config.admins:
         await message.answer("⛔ Доступ запрещен!")
@@ -37,7 +37,7 @@ async def show_admin_panel(message: types.Message):
         reply_markup=types.ReplyKeyboardRemove()
     )
 
-@router.message(AdminAuth.waiting_password, F.text)
+@auth_router.message(AdminAuth.waiting_password, F.text)
 async def admin_password_check(message: types.Message, state: FSMContext):
     if message.text == config.admin_password:
         await message.answer("✅ Успешная авторизация!")

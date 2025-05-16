@@ -1,6 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import IndexModel, ASCENDING
-from bot.config.config import config
+from config.config import config
 
 class MongoDatabase:
     def __init__(self):
@@ -19,7 +19,9 @@ class MongoDatabase:
             
             await self.reviews.create_indexes([
                 IndexModel([("user_id", ASCENDING)]),
-                IndexModel([("created_at", ASCENDING)])
+                IndexModel([("rating", ASCENDING)]),
+                IndexModel([("created_at", ASCENDING)]),
+                IndexModel([("is_approved", ASCENDING)])
             ])
             
         except Exception as e:
