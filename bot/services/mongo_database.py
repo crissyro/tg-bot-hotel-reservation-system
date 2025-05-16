@@ -30,3 +30,9 @@ class MongoDatabase:
         except Exception as e:
             print(f"❌ MongoDB index creation error: {e}")
             raise
+        
+    def get_reviews_collection(self):
+        return self.db.reviews
+
+    async def save_review(self, review_data: dict):
+        return await self.get_reviews_collection().insert_one(review_data)

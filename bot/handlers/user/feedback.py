@@ -52,6 +52,43 @@ async def cancel_rating(message: types.Message, state: FSMContext):
         reply_markup=main_keyboard()
     )
 
+# @feedback_router.message(FeedbackStates.waiting_for_rating)
+# async def process_rating(message: types.Message, state: FSMContext, mongo_db: MongoDatabase):
+#     try:
+#         rating = int(message.text)
+#         if 0 <= rating <= 10:
+#             data = await state.get_data()
+            
+#             review = Review(
+#                 user_id=message.from_user.id,
+#                 user_name=message.from_user.full_name,
+#                 text=data['review_text'],
+#                 rating=rating
+#             )
+            
+#             collection = mongo_db.get_reviews_collection()
+#             result = await collection.insert_one(review.model_dump())
+            
+#             if result.acknowledged:
+#                 await message.answer(
+#                     "✅ Спасибо за ваш отзыв!",
+#                     reply_markup=main_keyboard()
+#                 )
+#                 logging.info(f"Отзыв сохранен. ID: {result.inserted_id}")
+#             else:
+#                 await message.answer("❌ Ошибка при сохранении отзыва")
+#                 logging.error("Не удалось сохранить отзыв")
+            
+#             await state.clear()
+#         else:
+#             await message.answer("⚠️ Оценка должна быть от 0 до 10. Попробуйте снова:")
+#     except ValueError:
+#         await message.answer("❌ Пожалуйста, введите число от 0 до 10:")
+#     except Exception as e:
+#         logging.error(f"Ошибка при сохранении отзыва: {str(e)}")
+#         await message.answer("❌ Произошла ошибка при обработке вашего отзыва")
+#         await state.clear()
+        
 @feedback_router.message(FeedbackStates.waiting_for_rating)
 async def process_rating(message: types.Message, state: FSMContext, mongo_db: MongoDatabase):
     try:
@@ -70,21 +107,14 @@ async def process_rating(message: types.Message, state: FSMContext, mongo_db: Mo
             result = await collection.insert_one(review.model_dump())
             
             if result.acknowledged:
-                await message.answer(
-                    "✅ Спасибо за ваш отзыв!",
-                    reply_markup=main_keyboard()
-                )
-                logging.info(f"Отзыв сохранен. ID: {result.inserted_id}")
+                await message.answer("✅ Спасибо за отзыв!", reply_markup=main_keyboard())
             else:
-                await message.answer("❌ Ошибка при сохранении отзыва")
-                logging.error("Не удалось сохранить отзыв")
+                await message.answer("❌ Ошибка сохранения", reply_markup=main_keyboard())
             
             await state.clear()
         else:
-            await message.answer("⚠️ Оценка должна быть от 0 до 10. Попробуйте снова:")
-    except ValueError:
-        await message.answer("❌ Пожалуйста, введите число от 0 до 10:")
+            await message.answer("⚠️ Введите 0-10:")
     except Exception as e:
-        logging.error(f"Ошибка при сохранении отзыва: {str(e)}")
-        await message.answer("❌ Произошла ошибка при обработке вашего отзыва")
+        logging.error(f"Ошибка: {str(e)}")
+        await message.answer("❌ Ошибка обработки", reply_markup=main_keyboard())
         await state.clear()

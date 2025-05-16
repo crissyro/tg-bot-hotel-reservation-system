@@ -13,7 +13,7 @@ class AdminAuth(StatesGroup):
 
 @auth_router.message(Command("admin_input"))
 async def admin_login(message: types.Message, state: FSMContext):
-    if message.from_user.id not in config.admins:
+    if message.from_user.id not in config.ADMINS:
         await message.answer("⛔ Доступ запрещен!")
         return
         
@@ -39,7 +39,7 @@ async def show_admin_panel(message: types.Message):
 
 @auth_router.message(AdminAuth.waiting_password, F.text)
 async def admin_password_check(message: types.Message, state: FSMContext):
-    if message.text == config.admin_password:
+    if message.text == config.ADMIN_PASSWORD:
         await message.answer("✅ Успешная авторизация!")
         await show_admin_panel(message)
         await state.clear()
