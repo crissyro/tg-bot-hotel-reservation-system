@@ -4,8 +4,6 @@ from aiogram.fsm.storage.memory import MemoryStorage
 import logging
 
 from config import config
-from handlers.user import start
-from handlers.admin import login
 
 
 async def main():
@@ -13,9 +11,6 @@ async def main():
     
     bot = Bot(token=config.bot_token.get_secret_value())
     dp = Dispatcher(storage=MemoryStorage())
-
-    dp.include_router(start.router)
-    dp.include_router(login.router)
 
     await dp.start_polling(bot)
 
