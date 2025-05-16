@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
 from config.config import config
+from keyboards.admin import admin_panel_keyboard
 
 router = Router()
 
@@ -29,6 +30,11 @@ async def show_admin_panel(message: types.Message):
         "Выберите раздел для управления:",
         reply_markup=admin_panel_keyboard(),
         parse_mode="HTML"
+    )
+    
+    await message.answer(
+        "⌨️ Переключение на админ-клавиатуру...",
+        reply_markup=types.ReplyKeyboardRemove()
     )
 
 @router.message(AdminAuth.waiting_password, F.text)
