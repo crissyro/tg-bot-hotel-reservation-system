@@ -1,6 +1,7 @@
 import logging
 from aiogram import Router, types, F
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from keyboards.admin import admin_panel_keyboard
 from services.mongo_database import MongoDatabase
 from config.config import config
 
@@ -55,12 +56,15 @@ def build_reviews_keyboard(total: int, current_page: int) -> types.InlineKeyboar
     builder = InlineKeyboardBuilder()
     
     if current_page > 0:
-        builder.button(text="⬅️ Назад", callback_data=f"reviews_page_{current_page - 1}")
+        builder.button(text="⬅️ Предыдущая", callback_data=f"reviews_page_{current_page - 1}")
     
     if (current_page + 1) * PAGE_SIZE < total:
-        builder.button(text="Вперед ➡️", callback_data=f"reviews_page_{current_page + 1}")
+        builder.button(text="Следующая ➡️", callback_data=f"reviews_page_{current_page + 1}")
 
-    builder.adjust(2)
+    builder.button(text="🔙 Назад в меню", callback_data="admin_menu")
+    
+    builder.adjust(2, 1)
+    
     return builder.as_markup()
 
 @reviews_router.callback_query(F.data.startswith("reviews_page_"))
@@ -82,3 +86,21 @@ async def paginate_reviews(callback: types.CallbackQuery, mongo_db: MongoDatabas
         parse_mode="HTML"
     )
     await callback.answer()
+    
+@reviews_router.callback_query(F.data == "admin_menu")
+async def admin_menu_handler(callback: types.CallbackQuery):
+    try:
+        if callback.from_user.id not in config.ADMINS:
+            await callback.answer("⛔ Доступ запрещен!")
+            return
+        
+        await callback.message.edit_text(
+            "🛠 <b>Административное меню</b>\n"
+            "Выберите раздел для управления:",
+            reply_markup=admin_panel_keyboard(),
+            parse_mode="HTML"
+        )
+        
+    except Exception as e:
+        logging.error(f"Ошибка в админ-меню: {str(e)}")
+        await callback.answer("❌ Ошибка загрузки меню")
