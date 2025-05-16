@@ -12,6 +12,7 @@ frozenlist==1.6.0
 greenlet==3.2.2
 idna==3.10
 magic-filter==1.0.12
+motor==3.7.1
 multidict==6.4.3
 propcache==0.3.1
 pydantic==2.11.4
