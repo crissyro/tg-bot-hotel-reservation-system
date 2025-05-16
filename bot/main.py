@@ -8,6 +8,7 @@ from services.postgres_database import PostgresDatabase
 from config.config import config
 from handlers.user.start import start_router
 from handlers.admin.auth import auth_router
+from handlers.admin.reviews import reviews_router
 from handlers.user.feedback import feedback_router
 
 logging.basicConfig(
@@ -35,6 +36,7 @@ async def main():
         dp.include_router(start_router)
         dp.include_router(auth_router)
         dp.include_router(feedback_router)
+        dp.include_router(reviews_router)
 
         dp["postgres_db"] = postgres_db
         dp["mongo_db"] = mongo_db
