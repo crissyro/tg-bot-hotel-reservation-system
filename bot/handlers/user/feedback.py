@@ -1,5 +1,4 @@
 import logging
-
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -32,7 +31,7 @@ async def cancel_feedback(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
         "❌ Создание отзыва отменено",
-        reply_markup= main_keyboard  #types.ReplyKeyboardRemove()
+        reply_markup=main_keyboard()
     )
 
 @feedback_router.message(FeedbackStates.waiting_for_review)
@@ -50,7 +49,7 @@ async def cancel_rating(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
         "❌ Создание отзыва отменено",
-        reply_markup=main_keyboard
+        reply_markup=main_keyboard()
     )
 
 @feedback_router.message(FeedbackStates.waiting_for_rating)
@@ -59,24 +58,33 @@ async def process_rating(message: types.Message, state: FSMContext, mongo_db: Mo
         rating = int(message.text)
         if 0 <= rating <= 10:
             data = await state.get_data()
+            
             review = Review(
                 user_id=message.from_user.id,
+                user_name=message.from_user.full_name,
                 text=data['review_text'],
                 rating=rating
             )
             
-            result = await mongo_db.save_review(review.dict())
+            collection = mongo_db.get_reviews_collection()
+            result = await collection.insert_one(review.model_dump())
+            
             if result.acknowledged:
                 await message.answer(
                     "✅ Спасибо за ваш отзыв!",
-                    reply_markup=main_keyboard
+                    reply_markup=main_keyboard()
                 )
-                logging.info(f"Review saved: {review}")
+                logging.info(f"Отзыв сохранен. ID: {result.inserted_id}")
             else:
-                await message.answer("❌ Ошибка сохранения отзыва")
+                await message.answer("❌ Ошибка при сохранении отзыва")
+                logging.error("Не удалось сохранить отзыв")
             
             await state.clear()
         else:
             await message.answer("⚠️ Оценка должна быть от 0 до 10. Попробуйте снова:")
     except ValueError:
         await message.answer("❌ Пожалуйста, введите число от 0 до 10:")
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении отзыва: {str(e)}")
+        await message.answer("❌ Произошла ошибка при обработке вашего отзыва")
+        await state.clear()

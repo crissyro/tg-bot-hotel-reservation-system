@@ -1,34 +1,32 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import IndexModel, ASCENDING
+from pymongo import IndexModel, ASCENDING, DESCENDING, TEXT
 from config.config import config
 
 class MongoDatabase:
     def __init__(self):
-        self.client = AsyncIOMotorClient(
-            f"mongodb://{config.mongo_user}:{config.mongo_password.get_secret_value()}"
-            f"@{config.mongo_host}:{config.mongo_port}/{config.mongo_db}"
-        )
-        self.db = self.client[config.mongo_db]
-        self.reviews = self.db.reviews
+        self.client = None
+        self.db = None
 
     async def connect(self):
         try:
+            self.client = AsyncIOMotorClient(config.mongo_url)
+            self.db = self.client[config.MONGO_DB]
             await self.client.admin.command('ping')
-            
             print("✅ MongoDB connected")
-            
-            await self.reviews.create_indexes([
-                IndexModel([("user_id", ASCENDING)]),
-                IndexModel([("rating", ASCENDING)]),
-                IndexModel([("created_at", ASCENDING)]),
-                IndexModel([("is_approved", ASCENDING)])
-            ])
-            
         except Exception as e:
             print(f"❌ MongoDB connection error: {e}")
+            raise
 
-    async def save_review(self, review_data: dict):
-        return await self.reviews.insert_one(review_data)
-
-    async def get_reviews(self, filter_query: dict = None):
-        return await self.reviews.find(filter_query).to_list(None)
+    async def init_indexes(self):
+        try:
+            collection = self.db.reviews
+            await collection.create_indexes([
+                IndexModel([("user_id", ASCENDING)]),
+                IndexModel([("rating", DESCENDING)]),
+                IndexModel([("created_at", DESCENDING)]),
+                IndexModel([("is_approved", ASCENDING)])
+            ])
+            print("✅ MongoDB indexes created")
+        except Exception as e:
+            print(f"❌ MongoDB index creation error: {e}")
+            raise

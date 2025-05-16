@@ -10,7 +10,6 @@ class User(Base):
     telegram_id = Column(Integer, unique=True)
     name = Column(String(64))
     surname = Column(String(64))
-    phone = Column(String(20))
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
     bookings = relationship("Booking", back_populates="user")

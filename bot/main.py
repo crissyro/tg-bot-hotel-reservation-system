@@ -4,7 +4,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 import logging
 
 from services.mongo_database import MongoDatabase
-from services.postgres_database import Database
+from services.postgres_database import PostgresDatabase
 from config.config import config
 from handlers.user.start import start_router
 from handlers.admin.auth import auth_router
@@ -22,27 +22,27 @@ logging.basicConfig(
 async def main():
     logging.basicConfig(level=logging.INFO)
     
-    bot = Bot(token=config.bot_token.get_secret_value())
+    bot = Bot(token=config.BOT_TOKEN.get_secret_value())
     dp = Dispatcher(storage=MemoryStorage())
-    
-    dp.include_router(start_router)
-    dp.include_router(auth_router)
-    dp.include_router(feedback_router)
-    
-    postgres_db = Database()
+
+    postgres_db = PostgresDatabase()
     mongo_db = MongoDatabase()
     
-    await postgres_db.connect()
-    await mongo_db.connect()
+    try:
+        await mongo_db.connect()
+        await mongo_db.init_indexes()
+        
+        dp.include_router(start_router)
+        dp.include_router(auth_router)
+        dp.include_router(feedback_router)
 
-    start_router.postgres_db = postgres_db
-    start_router.mongo_db = mongo_db
-    auth_router.postgres_db = postgres_db
-    auth_router.mongo_db = mongo_db
+        dp["postgres_db"] = postgres_db
+        dp["mongo_db"] = mongo_db
 
-
-    await dp.start_polling(bot)
-
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
+

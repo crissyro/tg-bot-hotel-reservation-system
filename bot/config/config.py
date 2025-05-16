@@ -4,30 +4,54 @@ from typing import List
 
 
 class Settings(BaseSettings):
-    bot_token: SecretStr
+    BOT_TOKEN: SecretStr
 
-    postgres_user: str
-    postgres_password: SecretStr
-    postgres_db: str
-    postgres_host: str
-    postgres_port: int
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: SecretStr
+    POSTGRES_DB: str
+    POSTGRES_HOST: str
+    POSTGRES_PORT: int
 
-    mongo_user: str
-    mongo_password: SecretStr
-    mongo_host: str
-    mongo_port: int
-    mongo_db: str
+    MONGO_USER: str
+    MONGO_PASSWORD: SecretStr
+    MONGO_HOST: str
+    MONGO_PORT: int
+    MONGO_DB: str
 
-    admins: List[int]
-    admin_password: str
+    ADMINS: List[int]
+    ADMIN_PASSWORD: str
+    PGADMIN_EMAIL: str = ""   
+    PGADMIN_PASSWORD: str = "" 
     
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        extra="ignore",
+        env_prefix=""  
+    )
 
-    @field_validator("admins", mode="before")
+    @field_validator("ADMINS", mode="before")
     def split_admins(cls, v):
         if isinstance(v, str):
             return [int(admin.strip()) for admin in v.split(",")]
         return v
+    
+    @property
+    def postgres_url(self):
+        return (
+            f"postgresql+asyncpg://{self.POSTGRES_USER}:"
+            f"{self.POSTGRES_PASSWORD.get_secret_value()}@"
+            f"{self.POSTGRES_HOST}:"
+            f"{self.POSTGRES_PORT}/"
+            f"{self.POSTGRES_DB}"
+        )
+        
+    @property
+    def mongo_url(self):
+        return (
+            f"mongodb://{self.MONGO_USER}:{self.MONGO_PASSWORD.get_secret_value()}"
+            f"@{self.MONGO_HOST}:{self.MONGO_PORT}/"
+            f"{self.MONGO_DB}?authSource=admin"
+        )
 
 
 config = Settings()
