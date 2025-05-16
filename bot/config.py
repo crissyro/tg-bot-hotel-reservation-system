@@ -18,12 +18,6 @@ class Settings(BaseSettings):
     mongo_port: int
     mongo_db: str
 
-    redis_user: str
-    redis_password: SecretStr | None = None
-    redis_host: str
-    redis_port: int
-    redis_db: int = 0
-
     admins: List[int]
     admin_password: str
     
