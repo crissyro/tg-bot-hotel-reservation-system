@@ -19,10 +19,12 @@ class Room(Base):
     
     id = Column(Integer, primary_key=True)
     number = Column(String(10), unique=True)
-    type = Column(String(50))
-    price = Column(Numeric(10, 2))
-    is_available = Column(Boolean, default=True)
+    type = Column(String(20), nullable=False) 
+    price = Column(Numeric(10, 2), nullable=False)
     description = Column(String(500))
+    is_available = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), onupdate=datetime.utcnow)
 
 class Booking(Base):
     __tablename__ = "bookings"

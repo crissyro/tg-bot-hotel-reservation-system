@@ -4,8 +4,9 @@ def main_keyboard():
     builder = ReplyKeyboardBuilder()
     buttons = [
         ("🛎 Бронирование",),
+        ("💳 Оплатить бронь",),
+        ("❌ Отменить бронь",),
         ("🍽 Ресторан",),
-        ("🍸 Бар",),
         ("📝 Отзыв",),
         ("📞 Контакты",),
         ("ℹ️ О нас",)
@@ -20,3 +21,8 @@ def main_keyboard():
         one_time_keyboard=False,
         input_field_placeholder="Выберите действие..."
     )
+
+def back_keyboard():
+    builder = ReplyKeyboardBuilder()
+    builder.button(text="↩️ Отмена")
+    return builder.as_markup(resize_keyboard=True)
