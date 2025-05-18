@@ -56,15 +56,15 @@ def build_reviews_keyboard(total: int, current_page: int) -> types.InlineKeyboar
     builder = InlineKeyboardBuilder()
     
     if current_page > 0:
-        builder.button(text="⬅️ Предыдущая", callback_data=f"reviews_page_{current_page - 1}")
+        builder.button(text="⬅️ Назад", callback_data=f"reviews_page_{current_page - 1}")
     
     if (current_page + 1) * PAGE_SIZE < total:
-        builder.button(text="Следующая ➡️", callback_data=f"reviews_page_{current_page + 1}")
+        builder.button(text="Вперед ➡️", callback_data=f"reviews_page_{current_page + 1}")
 
-    builder.button(text="🔙 Назад в меню", callback_data="admin_menu")
+    builder.button(text="🔙 В меню", callback_data="admin_menu")
+    builder.button(text="🔄 Обновить", callback_data="admin_reviews")
     
-    builder.adjust(2, 1)
-    
+    builder.adjust(2, repeat=True)
     return builder.as_markup()
 
 @reviews_router.callback_query(F.data.startswith("reviews_page_"))

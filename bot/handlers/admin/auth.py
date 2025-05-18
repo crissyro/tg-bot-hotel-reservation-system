@@ -1,3 +1,4 @@
+import logging
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -45,3 +46,21 @@ async def admin_password_check(message: types.Message, state: FSMContext):
         await state.clear()
     else:
         await message.answer("❌ Неверный пароль! Попробуйте еще раз:")
+        
+@auth_router.callback_query(F.data == "admin_menu")
+async def admin_menu_handler(callback: types.CallbackQuery):
+    try:
+        if callback.from_user.id not in config.ADMINS:
+            await callback.answer("⛔ Доступ запрещен!")
+            return
+        
+        await callback.message.edit_text(
+            "🛠 <b>Административное меню</b>\n"
+            "Выберите раздел для управления:",
+            reply_markup=admin_panel_keyboard(),
+            parse_mode="HTML"
+        )
+        
+    except Exception as e:
+        logging.error(f"Ошибка в админ-меню: {str(e)}")
+        await callback.answer("❌ Ошибка загрузки меню")
