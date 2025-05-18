@@ -7,7 +7,7 @@ from services.postgres_crud.booking_crud import BookingCRUD
 from services.postgres_crud.room_crud import RoomCRUD
 from services.postgres_database import PostgresDatabase
 from keyboards.user import main_keyboard
-from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardMarkup
 
 booking_router = Router()
 
@@ -79,25 +79,62 @@ async def process_checkout(message: types.Message, state: FSMContext, postgres_d
             await state.clear()
             return
             
-        await state.update_data(checkout=checkout_date)
-        builder = InlineKeyboardBuilder()
-        for room in available_rooms:
-            builder.button(
-                text=f"№{room.number} ({room.type}) - {room.price}₽/ночь",
-                callback_data=f"select_room_{room.id}"
-            )
-        builder.adjust(1)
-        await message.answer(
-            "🏨 Выберите номер:",
-            reply_markup=builder.as_markup()
+        await state.update_data(
+            checkout=checkout_date,
+            available_rooms=available_rooms  
         )
+        
+        await show_rooms_page(message, available_rooms, page=0)
         await state.set_state(BookingStates.SELECT_ROOM)
         
     except ValueError as e:
         await message.answer(f"❌ Ошибка: {str(e)}\nПопробуйте еще раз:")
 
+async def show_rooms_page(message: types.Message, rooms: list, page: int):
+    PAGE_SIZE = 5
+    total_pages = (len(rooms) + PAGE_SIZE - 1) // PAGE_SIZE
+    page_rooms = rooms[page*PAGE_SIZE : (page+1)*PAGE_SIZE]
+    
+    builder = InlineKeyboardBuilder()
+    for room in page_rooms:
+        builder.button(
+            text=f"№{room.number} ({room.type}) - {room.price}₽",
+            callback_data=f"select_room_{room.id}"
+        )
+    
+    pagination = InlineKeyboardBuilder()
+    if page > 0:
+        pagination.button(text="⬅️", callback_data=f"rooms_page_{page-1}")
+    if (page + 1) * PAGE_SIZE < len(rooms):
+        pagination.button(text="➡️", callback_data=f"rooms_page_{page+1}")
+    
+    keyboard = InlineKeyboardBuilder()
+    keyboard.attach(builder)
+    keyboard.attach(pagination)
+    
+    await message.answer(
+        f"🏨 Доступные номера (Страница {page+1}/{total_pages}):\n\n" +
+        "\n".join(f"• №{room.number} ({room.type}) - {room.price}₽/ночь" for room in page_rooms),
+        reply_markup=keyboard.as_markup()
+    )
+
+@booking_router.callback_query(F.data.startswith("rooms_page_"))
+async def paginate_rooms(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    available_rooms = data.get('available_rooms', [])
+    
+    if not available_rooms:
+        await callback.answer("❌ Нет доступных номеров")
+        return
+    
+    page = int(callback.data.split("_")[-1])
+    await show_rooms_page(callback.message, available_rooms, page)
+    await callback.answer()
+
 @booking_router.callback_query(F.data.startswith("select_room_"))
-async def select_room(callback: types.CallbackQuery, state: FSMContext, postgres_db: PostgresDatabase):
+async def select_room(callback: types.CallbackQuery, 
+                     state: FSMContext, 
+                     postgres_db: PostgresDatabase):
     try:
         room_id = int(callback.data.split("_")[-1])
         
@@ -123,6 +160,7 @@ async def select_room(callback: types.CallbackQuery, state: FSMContext, postgres
         markup = InlineKeyboardBuilder()
         markup.button(text="✅ Подтвердить", callback_data="confirm_booking")
         markup.button(text="❌ Отменить", callback_data="cancel_booking_process")
+        markup.adjust(2)
         
         await callback.message.answer(
             f"🔎 Подтвердите бронирование:\n\n"

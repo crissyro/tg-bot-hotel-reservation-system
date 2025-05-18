@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, not_, select, update
 from models.postgres_models import Booking, Room
@@ -7,11 +8,12 @@ class RoomCRUD:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_room(self, number: str, room_type: str, price: float, description: str = ""):
+    async def create_room(self, number: str, room_type: str, price: float, capacity: int, description: str = ""):
         new_room = Room(
             number=number,
             type=room_type,
             price=price,
+            capacity=capacity,
             description=description
         )
         self.session.add(new_room)
@@ -43,32 +45,51 @@ class RoomCRUD:
         return result.scalars().all()
     
     async def get_available_rooms(self, check_in: datetime, check_out: datetime):
-        subquery = select(Booking.room_id).where(
-            and_(
-                Booking.check_in <= check_out,
-                Booking.check_out >= check_in
+        try:
+            subquery = select(Booking.room_id).where(
+                and_(
+                    Booking.check_in <= check_out,
+                    Booking.check_out >= check_in
+                )
             )
-        )
+            
+            result = await self.session.execute(
+                select(Room).where(
+                    Room.is_available == True,
+                    not_(Room.id.in_(subquery))
+                )
+            )
+            return result.scalars().all()
+        except Exception as e:
+            logging.error(f"Error getting available rooms: {str(e)}")
+            return []
         
+    async def get_room_by_id(self, room_id: int):
         result = await self.session.execute(
-            select(Room).where(
-                Room.is_available == True,
-                not_(Room.id.in_(subquery))
-            )
+            select(Room).where(Room.id == room_id)
         )
+        return result.scalar_one_or_none()
+
+    async def get_all_rooms(self):
+        result = await self.session.execute(select(Room))
         return result.scalars().all()
     
 async def create_initial_rooms(session: AsyncSession):
     room_crud = RoomCRUD(session)
     
-    for i in range(1, 21):
-        await room_crud.create_room(f"E{i:03}", "economy", 2000, "Бюджетный номер")
+    types_config = [
+        ("economy", 20, 2000, 2),
+        ("standard", 70, 3500, 3),
+        ("business", 20, 6000, 4),
+        ("vip", 10, 12000, 6)
+    ]
     
-    for i in range(1, 71):
-        await room_crud.create_room(f"S{i:03}", "standard", 3500, "Стандартный номер")
-    
-    for i in range(1, 21):
-        await room_crud.create_room(f"B{i:03}", "business", 6000, "Бизнес-класс")
-    
-    for i in range(1, 11):
-        await room_crud.create_room(f"V{i:03}", "vip", 12000, "VIP-апартаменты")
+    for room_type, count, price, capacity in types_config:
+        for i in range(1, count + 1):
+            await room_crud.create_room(
+                number=f"{room_type[0].upper()}{i:03}",
+                room_type=room_type,
+                price=price,
+                capacity=capacity,
+                description=f"{room_type.capitalize()} номер"
+            )

@@ -1,3 +1,4 @@
+import logging
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -39,28 +40,32 @@ async def toggle_room_status(callback: types.CallbackQuery,
     await list_rooms(callback, postgres_db)
 
 @admin_rooms_router.callback_query(F.data == "rooms_list")
-async def list_rooms(callback: types.CallbackQuery, postgres_db: PostgresDatabase):
-    async with postgres_db.session_scope() as session:
-        room_crud = RoomCRUD(session)
-        rooms = await room_crud.get_all_rooms()
-    
-    if not rooms:
-        await callback.answer("📭 Нет доступных номеров")
-        return
-    
-    builder = InlineKeyboardBuilder()
-    for room in rooms:
-        status = "✅" if room.is_available else "⛔"
-        builder.button(
-            text=f"{status} №{room.number} ({room.type})", 
-            callback_data=f"room_detail_{room.id}"
+async def list_rooms(callback: types.CallbackQuery, 
+                   postgres_db: PostgresDatabase):
+    try:
+        async with postgres_db.session_scope() as session:
+            room_crud = RoomCRUD(session)
+            rooms = await room_crud.get_all_rooms()
+        
+        if not rooms:
+            await callback.answer("📭 Нет доступных номеров")
+            return
+
+        text = "🏨 Список всех номеров:\n\n"
+        for idx, room in enumerate(rooms, 1):
+            text += f"{idx}. №{room.number} ({room.type}) - {room.price}₽ [{'✅' if room.is_available else '⛔'}]\n"
+
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔙 Назад", callback_data="admin_menu")
+        
+        await callback.message.edit_text(
+            text,
+            reply_markup=builder.as_markup()
         )
-    builder.adjust(1)
-    
-    await callback.message.edit_text(
-        "🏨 Список номеров:",
-        reply_markup=builder.as_markup()
-    )
+        
+    except Exception as e:
+        logging.error(f"List rooms error: {str(e)}")
+        await callback.answer("❌ Ошибка загрузки списка")
 
 @admin_rooms_router.callback_query(F.data.startswith("room_detail_"))
 async def room_detail(callback: types.CallbackQuery, postgres_db: PostgresDatabase):
@@ -108,3 +113,4 @@ async def add_room_process(message: types.Message, state: FSMContext, postgres_d
         
     except Exception:
         await message.answer("❌ Ошибка формата данных. Попробуйте еще раз:")
+        

@@ -21,6 +21,7 @@ class Room(Base):
     number = Column(String(10), unique=True)
     type = Column(String(20), nullable=False) 
     price = Column(Numeric(10, 2), nullable=False)
+    capacity = Column(Integer)
     description = Column(String(500))
     is_available = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
