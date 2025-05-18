@@ -11,3 +11,9 @@ from config.config import config
 
 booking_router = Router()
 
+class BookingStates(StatesGroup):
+    CHOOSE_CHECKIN = State()
+    CHOOSE_CHECKOUT = State()
+    SELECT_ROOM = State()
+    CONFIRM_BOOKING = State()
+    PAYMENT = State()
