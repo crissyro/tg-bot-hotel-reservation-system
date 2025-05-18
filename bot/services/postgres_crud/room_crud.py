@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_, not_, select, update
-from models.postgres_models import Booking, Room
+from sqlalchemy import and_, case, func, not_, select, update
+from models.postgres_models import Booking, Room, RoomStatusEnum
 
 class RoomCRUD:
     def __init__(self, session: AsyncSession):
@@ -20,10 +20,11 @@ class RoomCRUD:
         await self.session.commit()
         return new_room
 
-    async def update_room_status(self, room_id: int, is_available: bool):
-        stmt = update(Room).where(Room.id == room_id).values(is_available=is_available)
-        await self.session.execute(stmt)
-        await self.session.commit()
+    async def update_room_status(self, room_id: int, status: RoomStatusEnum):
+        room = await self.get_room_by_id(room_id)
+        if room:
+            room.status = status
+            await self.session.commit()
 
     async def get_room(self, room_id: int):
         result = await self.session.execute(select(Room).where(Room.id == room_id))
@@ -55,7 +56,7 @@ class RoomCRUD:
             
             result = await self.session.execute(
                 select(Room).where(
-                    Room.is_available == True,
+                    Room.status == RoomStatusEnum.AVAILABLE,
                     not_(Room.id.in_(subquery))
                 )
             )
@@ -73,6 +74,68 @@ class RoomCRUD:
     async def get_all_rooms(self):
         result = await self.session.execute(select(Room))
         return result.scalars().all()
+    
+    async def get_rooms_statistics(self):
+        income = await self.session.execute(
+            select(func.sum(Booking.total_price))
+            .where(Booking.check_in >= datetime.now() - timedelta(days=30))
+        )
+        total_income = income.scalar() or 0
+
+        rooms_status = await self.session.execute(
+            select(
+                func.count(Room.id),
+                func.sum(
+                    case(
+                        (Room.status == RoomStatusEnum.AVAILABLE, 1),
+                        else_=0
+                    )
+                )
+            )
+        )
+        total_rooms, available_rooms = rooms_status.first()
+
+        bookings_count = await self.session.execute(
+            select(func.count(Booking.id))
+            .where(Booking.check_in >= datetime.now() - timedelta(days=30))
+        )
+        
+        return {
+            "total_income": total_income,
+            "total_rooms": total_rooms,
+            "available_rooms": available_rooms,
+            "total_bookings": bookings_count.scalar()
+        }
+
+    async def refresh_rooms_availability(self):
+        rooms = await self.get_all_rooms()
+        for room in rooms:
+            bookings = await self.session.execute(
+                select(Booking)
+                .where(and_(
+                    Booking.room_id == room.id,
+                    Booking.check_out >= datetime.now()
+                ))
+            )
+            new_status = RoomStatusEnum.AVAILABLE if not bookings.scalars().first() \
+                else RoomStatusEnum.BOOKED
+            if room.status != new_status:
+                room.status = new_status
+                self.session.add(room)
+        await self.session.commit()
+        
+    async def auto_update_statuses(self):
+        rooms = await self.get_all_rooms()
+        for room in rooms:
+            if room.status == RoomStatusEnum.BOOKED:
+                bookings = await self.session.execute(
+                    select(Booking)
+                    .where(Booking.room_id == room.id)
+                    .where(Booking.check_out < datetime.now())
+                )
+                if not bookings.scalars().all():
+                    room.status = RoomStatusEnum.AVAILABLE
+        await self.session.commit()
     
 async def create_initial_rooms(session: AsyncSession):
     room_crud = RoomCRUD(session)

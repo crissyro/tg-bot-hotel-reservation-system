@@ -3,6 +3,7 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from datetime import datetime, timedelta
+from models.postgres_models import RoomStatusEnum
 from services.postgres_crud.booking_crud import BookingCRUD
 from services.postgres_crud.room_crud import RoomCRUD
 from services.postgres_database import PostgresDatabase
@@ -206,7 +207,7 @@ async def process_payment(callback: types.CallbackQuery,
             )
             
             room_crud = RoomCRUD(session)
-            await room_crud.update_room_status(data['room_id'], False)
+            await room_crud.update_room_status(data['room_id'], RoomStatusEnum.BOOKED)
 
         await callback.message.answer(
             "✅ Оплата прошла успешно!\n"
@@ -226,7 +227,7 @@ async def cancel_booking_process(callback: types.CallbackQuery, state: FSMContex
     await state.clear()
     await callback.message.edit_text(
         "❌ Бронирование отменено",
-        reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[]) 
+        reply_markup=main_keyboard()
     )
     await callback.answer()
 
