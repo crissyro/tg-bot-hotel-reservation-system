@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
-from models.postgres_models import User, Booking, RestaurantOrder, BarOrder
+from models.postgres_models import User, Booking
 
 class UserCRUD:
     def __init__(self, session: AsyncSession):
@@ -36,12 +36,6 @@ class UserCRUD:
     async def delete_user(self, user_id: int):
         await self.session.execute(
             delete(Booking).where(Booking.user_id == user_id)
-        )
-        await self.session.execute(
-            delete(RestaurantOrder).where(RestaurantOrder.user_id == user_id)
-        )
-        await self.session.execute(
-            delete(BarOrder).where(BarOrder.user_id == user_id)
         )
         await self.session.execute(
             delete(User).where(User.id == user_id)

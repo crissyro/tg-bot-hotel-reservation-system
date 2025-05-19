@@ -57,6 +57,7 @@ async def list_rooms(callback: types.CallbackQuery, postgres_db: PostgresDatabas
     try:
         async with postgres_db.session_scope() as session:
             crud = RoomCRUD(session)
+            await crud.refresh_rooms_availability()  
             rooms = await crud.get_all_rooms()
         
         if not rooms:
