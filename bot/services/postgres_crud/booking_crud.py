@@ -7,18 +7,17 @@ class BookingCRUD:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_booking(self, total_price: int, user_id: int, room_id: int, 
-                           check_in: datetime, check_out: datetime):
-        new_booking = Booking(
+    async def create_booking(self, total_price, user_id, room_id, check_in, check_out):
+        booking = Booking(
             total_price=total_price,
             user_id=user_id,
             room_id=room_id,
             check_in=check_in,
             check_out=check_out
         )
-        self.session.add(new_booking)
-        await self.session.commit()
-        return new_booking
+        self.session.add(booking)
+        await self.session.flush()  
+        return booking
 
     async def get_user_bookings(self, user_id: int):
         result = await self.session.execute(
@@ -27,9 +26,10 @@ class BookingCRUD:
         return result.scalars().all()
 
     async def cancel_booking(self, booking_id: int):
-        await self.session.execute(delete(Booking).where(Booking.id == booking_id))
-        await self.session.commit()
-        
+        await self.session.execute(
+            delete(Booking).where(Booking.id == booking_id)
+        )
+
     async def get_all_bookings(self):
         result = await self.session.execute(select(Booking))
         return result.scalars().all()

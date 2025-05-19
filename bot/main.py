@@ -13,6 +13,7 @@ from handlers.admin.auth import auth_router
 from handlers.admin.reviews import reviews_router
 from handlers.admin.rooms import admin_rooms_router
 from handlers.user.feedback import feedback_router
+from middlewares.db_session import DBSessionMiddleware
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,10 +34,12 @@ async def main():
     mongo_db = MongoDatabase()
     
     try:
-        await postgres_db.create_tables()
-        
         await mongo_db.connect()
         await mongo_db.init_indexes()
+        await postgres_db.create_tables()
+        
+        dp.message.middleware(DBSessionMiddleware(postgres_db.async_session_maker))
+        dp.callback_query.middleware(DBSessionMiddleware(postgres_db.async_session_maker))
         
         async with postgres_db.session_scope() as session:
             await create_initial_rooms(session)
@@ -50,6 +53,8 @@ async def main():
 
         dp["postgres_db"] = postgres_db
         dp["mongo_db"] = mongo_db
+        
+        
 
         await dp.start_polling(bot)
     finally:
