@@ -53,12 +53,11 @@ async def show_statistics(callback: types.CallbackQuery, postgres_db: PostgresDa
         await callback.answer("❌ Ошибка загрузки статистики")
 
 @admin_rooms_router.callback_query(F.data == "rooms_list")
-async def list_rooms(callback: types.CallbackQuery, postgres_db: PostgresDatabase):
+async def list_rooms(callback: types.CallbackQuery, postgres_db: PostgresDatabase, session):
     try:
-        async with postgres_db.session_scope() as session:
-            crud = RoomCRUD(session)
-            await crud.refresh_rooms_availability()  
-            rooms = await crud.get_all_rooms()
+        crud = RoomCRUD(session)
+        await crud.refresh_rooms_availability()  
+        rooms = await crud.get_all_rooms()
 
         if not rooms:
             await callback.answer("📭 Нет доступных номеров")
@@ -81,13 +80,12 @@ async def list_rooms(callback: types.CallbackQuery, postgres_db: PostgresDatabas
         await callback.answer("❌ Ошибка загрузки")
         
 @admin_rooms_router.callback_query(F.data == "refresh_statuses")
-async def refresh_room_statuses(callback: types.CallbackQuery, postgres_db: PostgresDatabase):
+async def refresh_room_statuses(callback: types.CallbackQuery, postgres_db: PostgresDatabase, session):
     try:
-        async with postgres_db.session_scope() as session:
-            crud = RoomCRUD(session)
-            await crud.refresh_rooms_availability()
-            await callback.answer("✅ Статусы номеров обновлены")
-            await list_rooms(callback, postgres_db)
+        crud = RoomCRUD(session)
+        await crud.refresh_rooms_availability()
+        await callback.answer("✅ Статусы номеров обновлены")
+        await list_rooms(callback, postgres_db)
     except Exception as e:
         logging.error(f"Refresh error: {str(e)}")
         await callback.answer("❌ Ошибка обновления статусов")
