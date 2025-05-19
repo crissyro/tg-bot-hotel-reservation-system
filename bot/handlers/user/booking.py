@@ -15,6 +15,17 @@ class BookingFSM(StatesGroup):
     confirming_booking = State()
     
 booking_router = Router()
+
+@booking_router.message(F.text == "❌ Отмена")
+async def cancel_handler(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("❌ Бронирование отменено.", reply_markup=main_keyboard())
+
+@booking_router.message(F.text == "↩️ Главное меню")
+async def back_to_main_menu(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("Вы вернулись в главное меню.", reply_markup=main_keyboard())
+    
 async def validate_date(date_str: str) -> datetime | None:
     try:
         return datetime.strptime(date_str, "%d.%m.%Y")
@@ -35,31 +46,31 @@ async def start_booking(message: Message, state: FSMContext):
 async def choose_dates(message: Message, state: FSMContext, **kwargs):
     session = kwargs.get("session")
     if session is None:
-        await message.answer("❌ Ошибка сервера: нет подключения к базе данных.")
+        await message.answer("❌ Ошибка сервера: нет подключения к базе данных.", reply_markup=back_keyboard())
         return
 
     state_data = await state.get_data()
     date = await validate_date(message.text)
 
     if not date:
-        await message.answer("❌ Неверный формат даты! Используйте ДД.MM.ГГГГ")
+        await message.answer("❌ Неверный формат даты! Используйте ДД.MM.ГГГГ", reply_markup=back_keyboard())
         return
 
     if not state_data.get("check_in"):
         await state.update_data(check_in=date)
-        await message.answer("📅 Введите дату выезда в формате ДД.MM.ГГГГ:")
+        await message.answer("📅 Введите дату выезда в формате ДД.MM.ГГГГ:", reply_markup=back_keyboard())
         return
 
     check_in = state_data["check_in"]
     if date <= check_in:
-        await message.answer("❗ Дата выезда должна быть позже даты заезда")
+        await message.answer("❗ Дата выезда должна быть позже даты заезда", reply_markup=back_keyboard())
         return
 
     room_crud = RoomCRUD(session)
     available_rooms = await room_crud.get_available_rooms(check_in, date)
 
     if not available_rooms:
-        await message.answer("😕 Нет доступных номеров на выбранные даты")
+        await message.answer("😕 Нет доступных номеров на выбранные даты", reply_markup=back_keyboard())
         await state.clear()
         return
 
@@ -122,6 +133,11 @@ async def confirm_booking(callback: CallbackQuery, state: FSMContext, session):
         f"📅 Выезд: {check_out_str}\n"
         f"💰 Итого: {total_price}₽"
     )
+    
+    await callback.message.answer(
+    "Вы вернулись в главное меню.",
+    reply_markup=main_keyboard()
+    )
     await state.clear()
 
 @booking_router.message(F.text == "🔙 Назад")
@@ -140,8 +156,3 @@ async def back_handler(message: Message, state: FSMContext):
         await message.answer("🏨 Выберите номер:", reply_markup=back_keyboard())
     else:
         await message.answer("🔙 Вы уже на начальном этапе.", reply_markup=main_keyboard())
-
-@booking_router.message(F.text == "❌ Отмена")
-async def cancel_handler(message: Message, state: FSMContext):
-    await state.clear()
-    await message.answer("❌ Бронирование отменено.", reply_markup=main_keyboard())
