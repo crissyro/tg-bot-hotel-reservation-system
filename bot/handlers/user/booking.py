@@ -226,8 +226,7 @@ async def pay_booking_select(callback: CallbackQuery, state: FSMContext):
 async def pay_booking_method_selected(callback: CallbackQuery, state: FSMContext, session):
     data = await state.get_data()
     booking_id = data.get("booking_id")
-
-    payment_method = callback.data.split("_")[1]  
+    payment_method = callback.data.split("_")[1]
 
     booking_crud = BookingCRUD(session)
     await booking_crud.mark_as_paid(booking_id)
@@ -235,10 +234,9 @@ async def pay_booking_method_selected(callback: CallbackQuery, state: FSMContext
     await callback.message.edit_text(
         f"✅ Оплата брони №{booking_id} успешно проведена через {payment_method.capitalize()}!\n"
         "Спасибо за оплату.",
-        reply_markup=main_keyboard()
+        reply_markup=None  
     )
     await state.clear()
-
 @booking_router.callback_query(F.data == "pay_back", BookingFSM.choosing_booking_to_pay)
 async def pay_back_to_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -278,11 +276,18 @@ async def cancel_booking_start(message: Message, state: FSMContext, session):
 
 @booking_router.callback_query(F.data.startswith("cancel_"))
 async def cancel_booking_confirm(callback: CallbackQuery, state: FSMContext, session):
-    booking_id = int(callback.data.split("_")[1])
-    booking_crud = BookingCRUD(session)
-    await booking_crud.cancel_booking(booking_id)
-    await callback.message.edit_text("✅ Бронирование отменено.", reply_markup=main_keyboard())
-    await state.clear()
+    try:
+        booking_id = int(callback.data.split("_")[1])
+        booking_crud = BookingCRUD(session)
+        await booking_crud.cancel_booking(booking_id)
+        await callback.message.edit_text(
+            "✅ Бронирование отменено.",
+            reply_markup=None  
+        )
+        await state.clear()
+    except (IndexError, ValueError) as e:
+        logging.error(f"Ошибка при отмене бронирования: {e}")
+        await callback.answer("❌ Некорректный ID брони")
 
 @booking_router.callback_query(F.data == "cancel_back")
 async def cancel_back_to_menu(callback: CallbackQuery, state: FSMContext):

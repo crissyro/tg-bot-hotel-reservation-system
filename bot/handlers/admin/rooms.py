@@ -59,7 +59,7 @@ async def list_rooms(callback: types.CallbackQuery, postgres_db: PostgresDatabas
             crud = RoomCRUD(session)
             await crud.refresh_rooms_availability()  
             rooms = await crud.get_all_rooms()
-        
+
         if not rooms:
             await callback.answer("📭 Нет доступных номеров")
             return
@@ -71,15 +71,14 @@ async def list_rooms(callback: types.CallbackQuery, postgres_db: PostgresDatabas
 
         builder = InlineKeyboardBuilder()
         builder.button(text="🔙 Назад", callback_data="rooms_management")
-        
+
         await callback.message.edit_text(
             text,
             reply_markup=builder.as_markup()
         )
-        
     except Exception as e:
-        logging.error(f"List rooms error: {str(e)}")
-        await callback.answer("❌ Ошибка загрузки списка")
+        logging.error(f"Ошибка при загрузке списка номеров: {e}")
+        await callback.answer("❌ Ошибка загрузки")
         
 @admin_rooms_router.callback_query(F.data == "refresh_statuses")
 async def refresh_room_statuses(callback: types.CallbackQuery, postgres_db: PostgresDatabase):
