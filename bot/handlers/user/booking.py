@@ -8,7 +8,7 @@ from services.postgres_crud.booking_crud import BookingCRUD
 from services.postgres_crud.room_crud import RoomCRUD
 from services.postgres_database import PostgresDatabase
 from keyboards.user import main_keyboard
-from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 booking_router = Router()
 
@@ -80,18 +80,20 @@ async def process_checkout(message: types.Message, state: FSMContext, postgres_d
             await state.clear()
             return
             
+        sent_message = await show_rooms_page(message, available_rooms, page=0)
         await state.update_data(
             checkout=checkout_date,
-            available_rooms=available_rooms  
+            available_rooms=available_rooms,
+            rooms_message_id=sent_message.message_id,
+            current_page=0
         )
-        
-        await show_rooms_page(message, available_rooms, page=0)
         await state.set_state(BookingStates.SELECT_ROOM)
         
-    except ValueError as e:
+    except Exception as e:
+        logging.error(f"Ошибка: {str(e)}", exc_info=True)
         await message.answer(f"❌ Ошибка: {str(e)}\nПопробуйте еще раз:")
 
-async def show_rooms_page(message: types.Message, rooms: list, page: int):
+async def show_rooms_page(message: types.Message, rooms: list, page: int) -> types.Message:
     PAGE_SIZE = 5
     total_pages = (len(rooms) + PAGE_SIZE - 1) // PAGE_SIZE
     page_rooms = rooms[page*PAGE_SIZE : (page+1)*PAGE_SIZE]
@@ -105,37 +107,81 @@ async def show_rooms_page(message: types.Message, rooms: list, page: int):
     
     pagination = InlineKeyboardBuilder()
     if page > 0:
-        pagination.button(text="⬅️", callback_data=f"rooms_page_{page-1}")
+        pagination.button(text="⬅️ Назад", callback_data=f"prev_page_{page}")
     if (page + 1) * PAGE_SIZE < len(rooms):
-        pagination.button(text="➡️", callback_data=f"rooms_page_{page+1}")
+        pagination.button(text="➡️ Вперед", callback_data=f"next_page_{page}")
+    
+    builder.adjust(1, repeat=True)
+    pagination.adjust(2)
     
     keyboard = InlineKeyboardBuilder()
     keyboard.attach(builder)
     keyboard.attach(pagination)
     
-    await message.answer(
+    return await message.answer(
         f"🏨 Доступные номера (Страница {page+1}/{total_pages}):\n\n" +
         "\n".join(f"• №{room.number} ({room.type}) - {room.price}₽/ночь" for room in page_rooms),
         reply_markup=keyboard.as_markup()
     )
 
-@booking_router.callback_query(F.data.startswith("rooms_page_"))
+@booking_router.callback_query(F.data.startswith("prev_page_"), F.data.startswith("next_page_"))
 async def paginate_rooms(callback: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    available_rooms = data.get('available_rooms', [])
-    
-    if not available_rooms:
-        await callback.answer("❌ Нет доступных номеров")
-        return
-    
-    page = int(callback.data.split("_")[-1])
-    await show_rooms_page(callback.message, available_rooms, page)
-    await callback.answer()
+    try:
+        data = await state.get_data()
+        available_rooms = data.get("available_rooms", [])
+        current_page = data.get("current_page", 0)
+        
+        if not available_rooms:
+            await callback.answer("❌ Нет доступных номеров")
+            return
+        
+        action, _, page = callback.data.partition("_page_")
+        current_page = int(page)
+        new_page = current_page - 1 if action == "prev" else current_page + 1
+        
+        PAGE_SIZE = 5
+        total_pages = (len(available_rooms) + PAGE_SIZE - 1) // PAGE_SIZE
+        
+        if new_page < 0 or new_page >= total_pages:
+            await callback.answer("❌ Нет доступных страниц")
+            return
+        
+        page_rooms = available_rooms[new_page*PAGE_SIZE : (new_page+1)*PAGE_SIZE]
+        
+        builder = InlineKeyboardBuilder()
+        for room in page_rooms:
+            builder.button(
+                text=f"№{room.number} ({room.type}) - {room.price}₽",
+                callback_data=f"select_room_{room.id}"
+            )
+        
+        pagination = InlineKeyboardBuilder()
+        if new_page > 0:
+            pagination.button(text="⬅️ Назад", callback_data=f"prev_page_{new_page}")
+        if (new_page + 1) * PAGE_SIZE < len(available_rooms):
+            pagination.button(text="➡️ Вперед", callback_data=f"next_page_{new_page}")
+        
+        builder.adjust(1, repeat=True)
+        pagination.adjust(2)
+        
+        keyboard = InlineKeyboardBuilder()
+        keyboard.attach(builder)
+        keyboard.attach(pagination)
+        
+        await callback.message.edit_text(
+            f"🏨 Доступные номера (Страница {new_page+1}/{total_pages}):\n\n" +
+            "\n".join(f"• №{room.number} ({room.type}) - {room.price}₽/ночь" for room in page_rooms),
+            reply_markup=keyboard.as_markup()
+        )
+        await state.update_data(current_page=new_page)
+        await callback.answer()
+        
+    except Exception as e:
+        logging.error(f"Ошибка пагинации: {str(e)}", exc_info=True)
+        await callback.answer("❌ Ошибка переключения страниц")
 
 @booking_router.callback_query(F.data.startswith("select_room_"))
-async def select_room(callback: types.CallbackQuery, 
-                     state: FSMContext, 
-                     postgres_db: PostgresDatabase):
+async def select_room(callback: types.CallbackQuery, state: FSMContext, postgres_db: PostgresDatabase):
     try:
         room_id = int(callback.data.split("_")[-1])
         
@@ -174,7 +220,7 @@ async def select_room(callback: types.CallbackQuery,
         await state.set_state(BookingStates.CONFIRM_BOOKING)
         
     except Exception as e:
-        logging.error(f"Select room error: {str(e)}")
+        logging.error(f"Ошибка выбора номера: {str(e)}", exc_info=True)
         await callback.answer("❌ Ошибка выбора номера")
 
 @booking_router.callback_query(F.data == "confirm_booking")
@@ -191,46 +237,53 @@ async def confirm_booking(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(BookingStates.PAYMENT)
 
 @booking_router.callback_query(F.data == "fake_payment")
-async def process_payment(callback: types.CallbackQuery, 
-                         state: FSMContext, 
-                         postgres_db: PostgresDatabase):
-    try:
-        data = await state.get_data()
-        
-        async with postgres_db.session_scope() as session:
-            booking_crud = BookingCRUD(session)
-            booking = await booking_crud.create_booking(
-                user_id=callback.from_user.id,
-                room_id=data['room_id'],
-                check_in=data['checkin'],
-                check_out=data['checkout']
-            )
-            
-            room_crud = RoomCRUD(session)
-            await room_crud.update_room_status(data['room_id'], RoomStatusEnum.BOOKED)
+async def process_payment(callback: types.CallbackQuery, state: FSMContext, postgres_db: PostgresDatabase):
 
-        await callback.message.answer(
-            "✅ Оплата прошла успешно!\n"
+    data = await state.get_data()
+        
+    async with postgres_db.session_scope() as session:
+        booking_crud = BookingCRUD(session)
+        booking = await booking_crud.create_booking(
+            user_id=callback.from_user.id,
+            room_id=data['room_id'],
+            check_in=data['checkin'],
+            check_out=data['checkout'],
+            total_price=(data['checkout'] - data['checkin']).days * data['room_price']
+        )
+            
+        room_crud = RoomCRUD(session)
+        await room_crud.update_room_status(
+            room_id=data['room_id'],
+            status=RoomStatusEnum.BOOKED
+        )
+            
+        await session.commit()
+
+    await callback.message.answer(
+            "✅ Бронирование подтверждено!\n"
             f"🔖 Номер брони: {booking.id}\n"
             f"🏠 Номер: {data['room_number']}\n"
-            f"📅 Даты: {data['checkin'].strftime('%d.%m')}-{data['checkout'].strftime('%d.%m')}",
+            f"📅 Даты: {data['checkin'].strftime('%d.%m')}-{data['checkout'].strftime('%d.%m')}\n"
+            f"💵 Сумма: {booking.total_price:.2f}₽",
             reply_markup=main_keyboard()
-        )
-        await state.clear()
+    )
         
-    except Exception as e:
-        logging.error(f"Payment error: {str(e)}")
-        await callback.answer("❌ Ошибка оплаты")
+    await state.clear()
+
+    # except Exception as e:
+    #     logging.error(f"Критическая ошибка бронирования: {str(e)}", exc_info=True)
+    #     await callback.answer("❌ Ошибка бронирования")
+    #     await state.clear()
 
 @booking_router.callback_query(F.data == "cancel_booking_process")
 async def cancel_booking_process(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text(
-        "❌ Бронирование отменено",
+    await callback.message.edit_text("❌ Бронирование отменено")
+    await callback.message.answer(
+        "Вы вернулись в главное меню:",
         reply_markup=main_keyboard()
     )
     await callback.answer()
-
 
 @booking_router.message(F.text == "❌ Отменить бронь")
 async def cancel_existing_booking_menu(message: types.Message, postgres_db: PostgresDatabase):
@@ -257,7 +310,7 @@ async def cancel_existing_booking_menu(message: types.Message, postgres_db: Post
         )
         
     except Exception as e:
-        logging.error(f"Cancel menu error: {str(e)}")
+        logging.error(f"Ошибка: {str(e)}")
         await message.answer("❌ Ошибка получения данных")
 
 @booking_router.callback_query(F.data.startswith("cancel_booking_"))
@@ -268,6 +321,7 @@ async def process_cancel_booking(callback: types.CallbackQuery, postgres_db: Pos
         async with postgres_db.session_scope() as session:
             booking_crud = BookingCRUD(session)
             await booking_crud.cancel_booking(booking_id)
+            await session.commit()
             
         await callback.message.edit_text(
             "✅ Бронирование успешно отменено\n" 
@@ -276,5 +330,5 @@ async def process_cancel_booking(callback: types.CallbackQuery, postgres_db: Pos
         await callback.answer()
         
     except Exception as e:
-        logging.error(f"Cancel booking error: {str(e)}")
+        logging.error(f"Ошибка отмены: {str(e)}")
         await callback.answer("❌ Ошибка отмены бронирования")

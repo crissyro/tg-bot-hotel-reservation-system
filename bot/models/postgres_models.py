@@ -22,12 +22,22 @@ class RoomStatusEnum(str, Enum):
     BOOKED = "booked"
     MAINTENANCE = "maintenance"
     CLOSED = "closed"
+    
+    @property
+    def emoji(self):
+        return {
+            self.AVAILABLE: "✅",
+            self.BOOKED: "⛔",
+            self.MAINTENANCE: "🛠",
+            self.CLOSED: "🔒"
+        }.get(self, "")
 
 class Room(Base):
     __tablename__ = "rooms"
     
     id = Column(Integer, primary_key=True)
     number = Column(String(10), unique=True)
+    human_name = Column(String(50))
     type = Column(String(20), nullable=False) 
     price = Column(Numeric(10, 2), nullable=False)
     capacity = Column(Integer)

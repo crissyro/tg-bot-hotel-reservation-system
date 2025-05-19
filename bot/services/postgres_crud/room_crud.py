@@ -8,9 +8,10 @@ class RoomCRUD:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_room(self, number: str, room_type: str, price: float, capacity: int, description: str = ""):
+    async def create_room(self, number: str, human_name: str, room_type: str, price: float, capacity: int, description: str = ""):
         new_room = Room(
             number=number,
+            human_name=human_name,
             type=room_type,
             price=price,
             capacity=capacity,
@@ -69,11 +70,11 @@ class RoomCRUD:
         result = await self.session.execute(
             select(Room).where(Room.id == room_id)
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def get_all_rooms(self):
         result = await self.session.execute(select(Room))
-        return result.scalars().all()
+        return result.scalars().all()  
     
     async def get_rooms_statistics(self):
         income = await self.session.execute(
@@ -141,16 +142,17 @@ async def create_initial_rooms(session: AsyncSession):
     room_crud = RoomCRUD(session)
     
     types_config = [
-        ("economy", 20, 2000, 2),
-        ("standard", 70, 3500, 3),
-        ("business", 20, 6000, 4),
-        ("vip", 10, 12000, 6)
+        ("economy", "Эконом", 20, 2000, 2),
+        ("standard", "Стандарт", 70, 3500, 3),
+        ("business", "Бизнес", 20, 6000, 4),
+        ("vip", "VIP", 10, 12000, 6)
     ]
     
-    for room_type, count, price, capacity in types_config:
+    for room_type, human_name, count, price, capacity in types_config:
         for i in range(1, count + 1):
             await room_crud.create_room(
                 number=f"{room_type[0].upper()}{i:03}",
+                human_name=human_name,
                 room_type=room_type,
                 price=price,
                 capacity=capacity,

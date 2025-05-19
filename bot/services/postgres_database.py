@@ -15,6 +15,9 @@ class PostgresDatabase:
     async def create_tables(self):
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            
+    def get_session(self):
+        return self.async_session()
     
     @asynccontextmanager
     async def session_scope(self):
