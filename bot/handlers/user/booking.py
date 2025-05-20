@@ -52,6 +52,7 @@ async def choose_dates(message: Message, state: FSMContext, **kwargs):
         return
 
     state_data = await state.get_data()
+    current_page = state_data.get("page", 1)
     date = await validate_date(message.text)
 
     if not date:
@@ -76,15 +77,117 @@ async def choose_dates(message: Message, state: FSMContext, **kwargs):
         await state.clear()
         return
 
-    builder = InlineKeyboardBuilder()
-    for i, room in enumerate(available_rooms, 1):
-        builder.button(text=f"{room.human_name} - {room.price}₽", callback_data=f"select_{room.id}")
-        if i % 2 == 0:
-            builder.row()  
+    PER_PAGE = 5
+    
+    total_pages = max((len(available_rooms) + PER_PAGE - 1) // PER_PAGE, 1)
+    current_page = max(1, min(current_page, total_pages))
+    page_rooms = available_rooms[(current_page-1)*PER_PAGE : current_page*PER_PAGE]
 
-    await state.update_data(check_out=date, rooms=[r.id for r in available_rooms])
-    await message.answer("🏨 Выберите номер:", reply_markup=builder.as_markup())
+    builder = InlineKeyboardBuilder()
+    
+    for room in page_rooms:
+        builder.row(InlineKeyboardButton(
+            text=f"🏨 {room.human_name} | 💰{room.price}₽/ночь | 👥{room.capacity} чел.",
+            callback_data=f"select_{room.id}"
+        ))
+
+    if total_pages > 1:
+        nav_buttons = []
+        if current_page > 1:
+            nav_buttons.append(InlineKeyboardButton(text="◀️", callback_data="prev_page"))
+        nav_buttons.append(InlineKeyboardButton(text=f"{current_page}/{total_pages}", callback_data="ignore"))
+        if current_page < total_pages:
+            nav_buttons.append(InlineKeyboardButton(text="▶️", callback_data="next_page"))
+        builder.row(*nav_buttons)
+
+    builder.row(InlineKeyboardButton(
+        text="❌ Отменить бронирование", 
+        callback_data="cancel_booking"
+    ))
+
+    await state.update_data(
+        check_out=date,
+        all_rooms=[r.id for r in available_rooms],
+        page=current_page,
+        total_pages=total_pages
+    )
+
+    await message.answer(
+        f"🏨 Страница {current_page}/{total_pages}. Выберите номер:",
+        reply_markup=builder.as_markup()
+    )
     await state.set_state(BookingFSM.selecting_room)
+
+async def build_rooms_keyboard(available_rooms: list, current_page: int, total_pages: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    
+    # Добавляем кнопки номеров
+    for room in available_rooms:
+        builder.row(InlineKeyboardButton(
+            text=f"🏨 {room.human_name} | 💰{room.price}₽/ночь | 👥{room.capacity} чел.",
+            callback_data=f"select_{room.id}"
+        ))
+
+    # Добавляем кнопки пагинации
+    if total_pages > 1:
+        nav_buttons = []
+        if current_page > 1:
+            nav_buttons.append(InlineKeyboardButton(text="◀️", callback_data="prev_page"))
+        nav_buttons.append(InlineKeyboardButton(text=f"{current_page}/{total_pages}", callback_data="ignore"))
+        if current_page < total_pages:
+            nav_buttons.append(InlineKeyboardButton(text="▶️", callback_data="next_page"))
+        builder.row(*nav_buttons)
+
+    # Добавляем кнопку отмены
+    builder.row(InlineKeyboardButton(
+        text="❌ Отменить бронирование", 
+        callback_data="cancel_booking"
+    ))
+    
+    return builder.as_markup()
+
+@booking_router.callback_query(F.data.in_(["prev_page", "next_page"]), BookingFSM.selecting_room)
+async def handle_pagination(callback: CallbackQuery, state: FSMContext, session):
+    data = await state.get_data()
+    current_page = data.get("page", 1)
+    total_pages = data.get("total_pages", 1)
+    
+    # Обновляем номер страницы
+    if callback.data == "prev_page":
+        current_page -= 1
+    else:
+        current_page += 1
+
+    # Получаем сохраненные данные о комнатах
+    room_crud = RoomCRUD(session)
+    available_rooms = await room_crud.get_available_rooms(
+        data["check_in"], 
+        data["check_out"]
+    )
+    
+    PER_PAGE = 5
+    total_pages = max((len(available_rooms) + PER_PAGE - 1) // PER_PAGE, 1)
+    current_page = max(1, min(current_page, total_pages))
+    page_rooms = available_rooms[(current_page-1)*PER_PAGE : current_page*PER_PAGE]
+
+    # Обновляем клавиатуру
+    keyboard = await build_rooms_keyboard(
+        page_rooms, 
+        current_page, 
+        total_pages
+    )
+    
+    # Редактируем сообщение
+    await callback.message.edit_text(
+        f"🏨 Страница {current_page}/{total_pages}. Выберите номер:",
+        reply_markup=keyboard
+    )
+    
+    await state.update_data(
+        page=current_page,
+        total_pages=total_pages
+    )
+    await callback.answer()
 
 @booking_router.callback_query(F.data.startswith("select_"))
 async def select_room(callback: CallbackQuery, state: FSMContext):
@@ -105,9 +208,11 @@ async def cancel_handler(message: Message, state: FSMContext):
 @booking_router.callback_query(F.data == "confirm_booking")
 async def confirm_booking(callback: CallbackQuery, state: FSMContext, session):
     data = await state.get_data()
+    
     user_crud = UserCRUD(session)
     booking_crud = BookingCRUD(session)
     room_crud = RoomCRUD(session)
+    
     logging.info(f"Поиск пользователя: {callback.from_user.id}")
     user = await user_crud.get_user_by_telegram_id(callback.from_user.id)
     logging.info(f"Результат: {user}")
@@ -170,6 +275,15 @@ async def back_handler(message: Message, state: FSMContext):
         await message.answer("🏨 Выберите номер:", reply_markup=back_keyboard())
     else:
         await message.answer("🔙 Вы уже на начальном этапе.", reply_markup=main_keyboard())
+
+@booking_router.callback_query(F.data == "cancel_booking")
+async def cancel_booking_callback(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text("❌ Бронирование отменено.")
+    await callback.message.answer(
+        "Вы вернулись в главное меню.",
+        reply_markup=main_keyboard()
+    )
 
 @booking_router.message(F.text == "💳 Оплатить бронь")
 async def pay_booking_start(message: Message, state: FSMContext, session):
