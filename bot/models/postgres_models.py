@@ -5,18 +5,6 @@ from sqlalchemy.orm import relationship
 from services.postgres_database import Base
 from datetime import datetime
 
-class User(Base):
-    __tablename__ = "users"
-    
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(Integer, unique=True)
-    name = Column(String(64))
-    surname = Column(String(64))
-    created_at = Column(DateTime(timezone=True), default=datetime.now)
-    bookings = relationship("Booking", back_populates="user")
-
-
 class RoomStatusEnum(str, Enum):
     AVAILABLE = "available"
     BOOKED = "booked"
@@ -31,6 +19,23 @@ class RoomStatusEnum(str, Enum):
             self.MAINTENANCE: "🛠",
             self.CLOSED: "🔒"
         }.get(self, "")
+        
+class BookingStatusEnum(str, Enum):
+    PENDING = "pending"      
+    ACTIVE = "active"         
+    CANCELLED = "cancelled"   
+    COMPLETED = "completed"
+    
+class User(Base):
+    __tablename__ = "users"
+    
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    telegram_id = Column(Integer, unique=True)
+    name = Column(String(64))
+    surname = Column(String(64))
+    created_at = Column(DateTime(timezone=True), default=datetime.now)
+    bookings = relationship("Booking", back_populates="user")
 
 class Room(Base):
     __tablename__ = "rooms"
@@ -50,11 +55,6 @@ class Room(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=datetime.now)
     bookings = relationship("Booking", back_populates="room")
 
-class BookingStatusEnum(str, Enum):
-    PENDING = "pending"      
-    ACTIVE = "active"         
-    CANCELLED = "cancelled"   
-    COMPLETED = "completed"
 
 class Booking(Base):
     __tablename__ = "bookings"
