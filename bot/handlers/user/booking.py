@@ -121,14 +121,12 @@ async def choose_dates(message: Message, state: FSMContext, **kwargs):
 async def build_rooms_keyboard(available_rooms: list, current_page: int, total_pages: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     
-    # Добавляем кнопки номеров
     for room in available_rooms:
         builder.row(InlineKeyboardButton(
             text=f"🏨 {room.human_name} | 💰{room.price}₽/ночь | 👥{room.capacity} чел.",
             callback_data=f"select_{room.id}"
         ))
 
-    # Добавляем кнопки пагинации
     if total_pages > 1:
         nav_buttons = []
         if current_page > 1:
@@ -138,7 +136,6 @@ async def build_rooms_keyboard(available_rooms: list, current_page: int, total_p
             nav_buttons.append(InlineKeyboardButton(text="▶️", callback_data="next_page"))
         builder.row(*nav_buttons)
 
-    # Добавляем кнопку отмены
     builder.row(InlineKeyboardButton(
         text="❌ Отменить бронирование", 
         callback_data="cancel_booking"
@@ -152,13 +149,11 @@ async def handle_pagination(callback: CallbackQuery, state: FSMContext, session)
     current_page = data.get("page", 1)
     total_pages = data.get("total_pages", 1)
     
-    # Обновляем номер страницы
     if callback.data == "prev_page":
         current_page -= 1
     else:
         current_page += 1
 
-    # Получаем сохраненные данные о комнатах
     room_crud = RoomCRUD(session)
     available_rooms = await room_crud.get_available_rooms(
         data["check_in"], 
@@ -170,14 +165,12 @@ async def handle_pagination(callback: CallbackQuery, state: FSMContext, session)
     current_page = max(1, min(current_page, total_pages))
     page_rooms = available_rooms[(current_page-1)*PER_PAGE : current_page*PER_PAGE]
 
-    # Обновляем клавиатуру
     keyboard = await build_rooms_keyboard(
         page_rooms, 
         current_page, 
         total_pages
     )
     
-    # Редактируем сообщение
     await callback.message.edit_text(
         f"🏨 Страница {current_page}/{total_pages}. Выберите номер:",
         reply_markup=keyboard
